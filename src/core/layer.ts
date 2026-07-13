@@ -1,0 +1,6 @@
+﻿export interface Layer { id: string; name: string; type: 'raster' | 'vector' | 'text' | 'adjustment'; visible: boolean; opacity: number; blendMode: 'normal' | 'multiply' | 'screen' | 'overlay' | 'difference'; locked: boolean; }
+export interface RasterLayer extends Layer { type: 'raster'; width: number; height: number; pixels: ImageData; }
+export interface VectorLayer extends Layer { type: 'vector'; paths: Path[]; }
+export interface Path { points: { x: number; y: number; pressure?: number }[]; closed: boolean; strokeColor: string; strokeWidth: number; fillColor?: string; }
+export interface TextLayer extends Layer { type: 'text'; content: string; fontFamily: string; fontSize: number; color: string; alignment: 'left' | 'center' | 'right'; }
+export class LayerManager { private layers: Layer[] = []; add(layer: Layer): void { this.layers.push(layer); } remove(id: string): void { this.layers = this.layers.filter(l => l.id !== id); } reorder(id: string, newIndex: number): void { const idx = this.layers.findIndex(l => l.id === id); if (idx === -1) return; const [layer] = this.layers.splice(idx, 1); this.layers.splice(newIndex, 0, layer); } getAll(): Layer[] { return this.layers; } getVisible(): Layer[] { return this.layers.filter(l => l.visible); } }
