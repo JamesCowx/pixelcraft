@@ -1,0 +1,162 @@
+﻿import { useRef, useState, useEffect } from 'react';
+
+const COLORS = ['#60a5fa', '#f472b6', '#a78bfa', '#34d399', '#fbbf24', '#ffffff', '#f87171', '#38bdf8', '#fb7185', '#a3e635'];
+const BRUSH_SIZES = [2, 4, 6, 10, 16];
+
+export default function CanvasDemo() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [color, setColor] = useState('#60a5fa');
+  const [brushSize, setBrushSize] = useState(4);
+  const [opacity, setOpacity] = useState(1);
+  const lastPos = useRef({ x: 0, y: 0 });
+  const [history, setHistory] = useState<ImageData[]>([]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    canvas.width = canvas.offsetWidth * 2;
+    canvas.height = 500 * 2;
+    ctx.scale(2, 2);
+    ctx.fillStyle = '#060810';
+    ctx.fillRect(0, 0, canvas.offsetWidth, 500);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = opacity;
+    saveState(ctx, canvas);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function saveState(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+    setHistory((prev) => [...prev.slice(-24), ctx.getImageData(0, 0, canvas.width, canvas.height)]);
+  }
+
+  function undo() {
+    const canvas = canvasRef.current;
+    if (!canvas || history.length < 2) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const newH = [...history]; newH.pop(); setHistory(newH);
+    ctx.putImageData(newH[newH.length - 1], 0, 0);
+  }
+
+  function clear() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#060810';
+    ctx.fillRect(0, 0, canvas.offsetWidth, 500);
+    saveState(ctx, canvas);
+  }
+
+  function getPos(e: React.MouseEvent | React.TouchEvent) {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    if ('touches' in e) return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function startDraw(e: React.MouseEvent | React.TouchEvent) { setDrawing(true); lastPos.current = getPos(e); }
+  function draw(e: React.MouseEvent | React.TouchEvent) {
+    if (!drawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const pos = getPos(e);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = brushSize;
+    ctx.globalAlpha = opacity;
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    lastPos.current = pos;
+  }
+  function stopDraw() {
+    if (!drawing) return;
+    setDrawing(false);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    saveState(ctx, canvas);
+  }
+
+  return (
+    <div className="liquid-glass rounded-2xl p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-lg bg-[#60a5fa]/15 flex items-center justify-center text-sm">ðŸŽ¨</div>
+          <div>
+            <h3 className="text-sm font-semibold">PixelCraft Studio</h3>
+            <div className="text-[10px] text-[var(--color-text-muted)]">Vector Canvas Â· 1920Ã—1080</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={undo} disabled={history.length < 2}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-white/[0.03] border border-white/[0.05] text-[var(--color-text-muted)] hover:text-white hover:border-white/[0.1] disabled:opacity-30 transition-all cursor-pointer">
+            â†© Undo
+          </button>
+          <button onClick={clear}
+            className="px-3 py-1.5 rounded-lg text-[11px] font-medium bg-red-500/10 border border-red-500/20 text-red-400 hover:text-red-300 hover:border-red-500/30 transition-all cursor-pointer">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <canvas ref={canvasRef}
+        className="w-full rounded-xl cursor-crosshair touch-none border border-white/[0.04]"
+        style={{ height: 500 }}
+        onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+        onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+      />
+
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-1.5">
+          {COLORS.map((c) => (
+            <button key={c} onClick={() => setColor(c)}
+              className={`w-6 h-6 rounded-full cursor-pointer transition-all duration-200 hover:scale-115 border-2 ${color === c ? 'border-white scale-115 shadow-lg shadow-white/20' : 'border-transparent'}`}
+              style={{ backgroundColor: c }} />
+          ))}
+        </div>
+
+        <div className="h-5 w-px bg-white/[0.08]" />
+
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-[var(--color-text-muted)] w-8">Size</span>
+          {BRUSH_SIZES.map((s) => (
+            <button key={s} onClick={() => setBrushSize(s)}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center cursor-pointer transition-all ${brushSize === s ? 'bg-white/[0.08] border border-white/[0.12]' : 'bg-white/[0.02] border border-white/[0.04]'}`}>
+              <span className="rounded-full" style={{ width: s + 2, height: s + 2, backgroundColor: color, opacity: s > 10 ? 0.7 : 1 }} />
+            </button>
+          ))}
+        </div>
+
+        <div className="h-5 w-px bg-white/[0.08]" />
+
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-[var(--color-text-muted)]">Opacity</span>
+          <input type="range" min="10" max="100" value={opacity * 100}
+            onChange={(e) => setOpacity(Number(e.target.value) / 100)}
+            className="w-20 accent-[#60a5fa]" />
+          <span className="text-[10px] font-mono text-[var(--color-text-muted)]">{Math.round(opacity * 100)}%</span>
+        </div>
+
+        <div className="ml-auto flex items-center gap-3">
+          <div className="text-[10px] text-[var(--color-text-muted)]">
+            <span className="text-[#60a5fa] font-semibold">{history.length}</span> strokes
+          </div>
+          <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/[0.03] text-[var(--color-text-muted)] font-mono">{drawing ? 'drawing...' : 'idle'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
